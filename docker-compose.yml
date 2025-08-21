@@ -1,25 +1,23 @@
-version: "3.9"
-
 services:
   tests:
     build: .
-    environment:
-      BASE_URL: https://demo.sylius.com
-      WORKERS: "2"
+    image: sylius-pw-runner:1.54
     shm_size: 1gb
-    working_dir: /tests
+    working_dir: /app/src
+    environment:
+      - BASE_URL=https://demo.sylius.com/en_US/
+      - WORKERS=2
+      # куда класть HTML-отчёт (Playwright поймёт это env)
+      - PLAYWRIGHT_HTML_REPORT=/app/src/playwright-report
     volumes:
-      - ./playwright-report:/tests/playwright-report   # отчёт на хост
-      - ./:/tests                                      # код с хоста
-      - node_cache:/tests/node_modules                 # именованный том для node_modules
-    command: >
-      bash -lc '
-        if [ ! -d node_modules ] || [ -z "$(ls -A node_modules)" ]; then
-          npm ci;
-        fi;
-        npx playwright test --reporter=html
-      '
-
-volumes:
-  node_cache:
-
+      # Монтируем ВЕСЬ репозиторий внутрь /app/src:
+      - .:/app/src
+    command:
+      - bash
+      - -lc
+      - >
+        mkdir -p /app/src/playwright-report /app/src/test-results;
+        # чистим содержимое (а не сам маунт)
+        find /app/src/playwright-report -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true;
+        npx playwright test -c /app/src/playwright.config.js --workers=$${WORKERS:-2} &&
+        ls -la /app/src/playwright-report
