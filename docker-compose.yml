@@ -7,17 +7,8 @@ services:
     environment:
       - BASE_URL=https://demo.sylius.com/en_US/
       - WORKERS=2
-      # куда класть HTML-отчёт (Playwright поймёт это env)
       - PLAYWRIGHT_HTML_REPORT=/app/src/playwright-report
     volumes:
-      # Монтируем ВЕСЬ репозиторий внутрь /app/src:
       - .:/app/src
-    command:
-      - bash
-      - -lc
-      - >
-        mkdir -p /app/src/playwright-report /app/src/test-results;
-        # чистим содержимое (а не сам маунт)
-        find /app/src/playwright-report -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true;
-        npx playwright test -c /app/src/playwright.config.js --workers=$${WORKERS:-2} &&
-        ls -la /app/src/playwright-report
+    command: ["/bin/bash", "/app/src/scripts/run.sh"]
+

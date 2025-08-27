@@ -161,3 +161,21 @@ test("E2E-06a: Пустая Verification при заполненном Password 
 
   await expect(byText(page, "The entered passwords don't match")).toBeVisible();
 });
+
+// E2E-07 — "Sign in here." ведёт на страницу логина
+test('E2E-07: Переход по ссылке Sign in here -> Login', async ({ page }) => {
+  const reg = new RegistrationPage(page);
+  await reg.open();
+
+  await reg.signInLink.click();
+
+  // URL с учётом возможного префикса локали (например, /en_US/login)
+  await expect(page).toHaveURL(/\/(?:[a-z]{2}_[A-Z]{2}\/)?login\b/i);
+
+  // Ключевые элементы формы логина
+  await expect(page.getByRole('heading', { name: /^Login$/i })).toBeVisible();
+  await expect(page.getByLabel(/Username|Email/i)).toBeVisible();
+  await expect(page.getByLabel(/Password/i)).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Login$/i })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Forgot password\?/i })).toBeVisible();
+});
