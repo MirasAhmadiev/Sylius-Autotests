@@ -1,14 +1,19 @@
 services:
   tests:
     build: .
-    image: sylius-pw-runner:1.54
-    shm_size: 1gb
+    image: sylius-pw-runner:1.54        # имя для собранного образа (не обязательно)
+    shm_size: 1g
     working_dir: /app/src
-    environment:
-      - BASE_URL=https://demo.sylius.com/en_US/
-      - WORKERS=2
-      - PLAYWRIGHT_HTML_REPORT=/app/src/playwright-report
     volumes:
       - .:/app/src
-    command: ["/bin/bash", "/app/src/scripts/run.sh"]
-
+    # VNC наружу для живого просмотра/дебага
+    ports:
+      - "5900:5900"
+    # стартуем Xvfb + x11vnc + fluxbox
+    entrypoint: ["/usr/local/bin/start-vnc.sh"]
+    # дефолт — гоняем все тесты в headed; команду можно переопределять при запуске
+    command: ["bash","-lc","${CMD:-npx playwright test --headed}"]
+    environment:
+      BASE_URL: https://demo.sylius.com/en_US/
+      PLAYWRIGHT_HTML_REPORT: /app/src/playwright-report
+      DISPLAY: ":99"                # на всякий случай; start-vnc.sh тоже выставляет

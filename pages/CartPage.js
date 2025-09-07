@@ -85,22 +85,55 @@ export class CartPage {
 }
 
 
-  // Устойчивое очищение корзины
+// Устойчивое очищение корзины
 async clearCart() {
   if (await this.clearCartBtn.count()) {
     const btn = this.clearCartBtn.first();
     await btn.scrollIntoViewIfNeeded().catch(() => {});
     await Promise.all([
-      // даём LiveComponent завершить действие
-      this.page.waitForLoadState('networkidle').catch(() => {}),
       btn.click(),
+      this.page.waitForLoadState('networkidle').catch(() => {}),
     ]);
-    // дождёмся результата (корзина опустела или был перерендер)
-    await this.page.getByText(/Your cart is empty/i).first()
-      .waitFor({ timeout: 3000 }).catch(() => {});
+    // Дождаться любого корректного признака пустой корзины
+    await this.assertEmpty();
     return true;
   }
   return false;
+}
+
+// Проверка «пустая корзина?» несколькими сигналами
+async isEmpty() {
+  // 1) Глобальный баннер
+  const emptyBanner = this.page.getByText(/Your cart is empty/i).first();
+  if (await emptyBanner.isVisible().catch(() => false)) return true;
+
+  // 2) Если мы всё ещё на странице Cart — нет строк / нули в Summary / нет Checkout
+  if (await this.heading.count()) {
+    if ((await this.rows.count()) === 0) return true;
+
+    if (await this.summaryBox.count()) {
+      const text = (await this.summaryBox.textContent()) || '';
+      const money = this.#money(text);
+      if (money === 0 || /€\s*0(?:\.?0*)?/.test(text)) return true;
+    }
+
+    if ((await this.page.getByRole('button', { name: /Checkout/i }).count()) === 0) {
+      return true;
+    }
+  }
+
+  // 3) Бейдж корзины исчез или "0"
+  const badge = this.page.locator('.cart .label, .cart .ui.label, .cart .badge').first();
+  if (!(await badge.count())) return true;
+  const badgeText = (await badge.textContent())?.trim() || '';
+  return badgeText === '0';
+}
+
+// Удобный ассертер с ретраями
+async assertEmpty() {
+  await expect(async () => {
+    expect(await this.isEmpty()).toBeTruthy();
+  }).toPass({ timeout: 5000, intervals: [300, 600, 900] });
 }
 
 // Back-compat: старый вызов остаётся рабочим

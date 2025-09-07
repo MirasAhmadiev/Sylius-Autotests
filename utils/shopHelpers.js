@@ -13,6 +13,34 @@ export function parseMoney(text) {
   return Number(norm);
 }
 
+export async function waitCartEnter(page) {
+  const until = Date.now() + 5000;
+
+  while (Date.now() < until) {
+    // 1) Баннер "Item has been added to cart"?
+    const bannerVisible = await page.getByText(/Item has been added to cart/i)
+      .first().isVisible().catch(() => false);
+    if (bannerVisible) break;
+
+    // 2) Бейдж стал "1"?
+    const badge = await getHeaderCartBadge(page);        // теперь безопасно
+    if (badge && /\b1\b/.test(badge)) break;
+
+    // 3) Даём странице «перехватить» навигацию и стабилизироваться
+    await page.waitForTimeout(150);
+  }
+
+  // Дальше — открываем корзину штатным способом
+  await openCart(page);
+
+  // И убеждаемся, что корзина готова
+  await page.getByRole('heading', { name: /(Your shopping cart|Cart)/i })
+    .first().waitFor({ timeout: 8000 });
+  await page.locator('.order-summary, aside .order-summary, .summary')
+    .first().waitFor({ timeout: 1500, state: 'attached' }).catch(() => {});
+}
+
+
 /**
  * Гарантируем, что в корзине есть хотя бы 1 товар.
  * Надёжно открываем Caps → Simple, открываем карточку,
@@ -57,18 +85,8 @@ export async function ensureCartHasOneItem(page) {
 
 
   // 4) Кликаем Add to cart и ждём переход в /cart (или добираемся туда фолбэком)
-    await Promise.all([
-    page.waitForResponse(
-      r => /\/cart\/add\b/.test(r.url()) && r.request().method() === 'POST',
-      { timeout: 15_000 }
-    ).catch(() => null),
-    addBtn.click(),
-  ]);
-
-  await page.waitForURL(/\/cart(\?|$)/, { timeout: 15_000 }).catch(async () => {
-    // фолбэк, если редирект не отработал
-    await openCart(page);
-  });
+  await addBtn.click();
+  await waitCartEnter(page);
 
   // если по какой-то причине не на /cart — идём прямым маршрутом
   if (!/\/cart(\?|$)/.test(page.url())) {
@@ -107,9 +125,20 @@ if (await fatal.isVisible().catch(() => false) || await emptyInfo.isVisible().ca
 }
 
 /**
- * Возвращает текст бейджа на иконке корзины (или null, если его нет)
+ * Возвращает текст бейджа на иконке корзины (или null, если его нет/навигация).
  */
 export async function getHeaderCartBadge(page) {
-  const badge = page.locator('.cart .label, .cart .ui.label, .cart .badge').first();
-  return (await badge.count()) ? (await badge.textContent())?.trim() : null;
+  const badge = page.locator(
+    'a[href*="cart"] .label, a[href*="cart"] .ui.label, a[href*="cart"] .badge, .cart .label, .cart .ui.label, .cart .badge'
+  ).first();
+
+  try {
+    const n = await badge.count().catch(() => 0);        // навигация? вернём 0 и перезапросим
+    if (!n) return null;
+    const text = await badge.textContent({ timeout: 1000 }).catch(() => null);
+    return text?.trim() ?? null;
+  } catch {
+    // execution context разрушен из-за навигации — отдаём null, чтобы верхний код повторил попытку
+    return null;
+  }
 }
