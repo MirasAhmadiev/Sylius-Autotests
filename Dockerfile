@@ -1,33 +1,21 @@
-# Базовый образ Playwright (с браузерами)
+# База с браузерами и всеми deps
 FROM mcr.microsoft.com/playwright:v1.54.2-jammy
 
-# ---- твоя часть: зависимости проекта ----
+# Рабочая папка
 WORKDIR /app
+
+# Ставим зависимости по lock-файлу (кэшируется как слой)
 COPY package*.json ./
-RUN npm ci && npx playwright install --with-deps
+RUN npm ci
 
-# Чтобы код лежал в /app/src, а зависимости виделись из /app/node_modules
-ENV NODE_PATH=/app/node_modules
+# Кладём исходники
+COPY . .
 
-# Выбираем тайм-зону (например, Алматы)
+# Опционально: часовой пояс (без apt, просто env)
 ENV TZ=Asia/Almaty
 
-# Неинтерактивная установка + VNC + WM
-RUN --mount=type=cache,target=/var/cache/apt \
-    --mount=type=cache,target=/var/lib/apt \
-    apt-get update \
- && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata x11vnc fluxbox \
- && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
- && rm -rf /var/lib/apt/lists/*
+# Пользователь по умолчанию уже pwuser в base image
+# Никаких DISPLAY, VNC, X11 не нужно
 
-# В образе Playwright Xvfb уже есть; просто укажем дисплей
-ENV DISPLAY=:99
-
-# стартуем Xvfb и VNC, затем выполняем переданную команду
-COPY scripts/start-vnc.sh /usr/local/bin/start-vnc.sh
-RUN chmod +x /usr/local/bin/start-vnc.sh
-
-# возвращаем безопасного юзера Playwright
-USER root
-RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
-USER pwuser
+# По умолчанию просто даём команду; в compose можно переопределить
+CMD ["npx", "playwright", "test"]

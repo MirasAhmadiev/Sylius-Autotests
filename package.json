@@ -12,7 +12,8 @@
     "docker:build": "docker build -t sylius-tests .",
     "docker:test": "docker run --rm -v %cd%:/tests --env-file .env sylius-tests npx playwright test",
     "compose:up": "docker compose up --abort-on-container-exit --exit-code-from tests",
-    "compose:down": "docker compose down -v"
+    "compose:down": "docker compose down -v",
+    "debug": "playwright test --project=chromium --debug"
   },
   "keywords": [],
   "author": "",
