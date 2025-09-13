@@ -4,3 +4,4 @@ test-results
 .git
 .gitignore
 .DS_Store
+test_cases.md

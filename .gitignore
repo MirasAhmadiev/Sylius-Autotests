@@ -6,3 +6,5 @@ node_modules/
 /blob-report/
 /playwright/.cache/
 .env
+test_cases.md
+.DS_Store
